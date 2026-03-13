@@ -8,7 +8,7 @@ Features auto-wrapping, centering, color/symbol escape codes, and a dry-run prev
 
 ### Prerequisites
 
-- Go 1.23+
+- Go 1.22+
 - A Vestaboard with a Read/Write API key (cloud) or a Local API key (local)
 
 ### Obtaining API Tokens
