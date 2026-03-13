@@ -14,6 +14,61 @@ const (
 	cloudBaseURL = "https://rw.vestaboard.com/"
 )
 
+// APIError represents an error from the Vestaboard API
+type APIError struct {
+	StatusCode int
+	Type       string
+	Message    string
+	RawBody    string
+}
+
+func (e *APIError) Error() string {
+	return e.FriendlyMessage()
+}
+
+// FriendlyMessage returns a user-friendly error message
+func (e *APIError) FriendlyMessage() string {
+	switch e.Type {
+	case "FingerprintMatch":
+		return "This message is already displayed on the board"
+	case "QuietHours":
+		return "Quiet hours are enabled on this Vestaboard"
+	case "RateLimited":
+		return "Rate limited. Wait ~15 seconds between messages"
+	default:
+		if e.Message != "" {
+			return e.Message
+		}
+		return fmt.Sprintf("API error (status %d)", e.StatusCode)
+	}
+}
+
+// VerboseMessage returns detailed error information
+func (e *APIError) VerboseMessage() string {
+	return fmt.Sprintf("Status: %d\nType: %s\nMessage: %s\nRaw: %s",
+		e.StatusCode, e.Type, e.Message, e.RawBody)
+}
+
+// parseAPIError extracts error details from API response
+func parseAPIError(statusCode int, body []byte) *APIError {
+	apiErr := &APIError{
+		StatusCode: statusCode,
+		RawBody:    string(body),
+	}
+
+	var errResp struct {
+		Status  string `json:"status"`
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(body, &errResp) == nil {
+		apiErr.Type = errResp.Type
+		apiErr.Message = errResp.Message
+	}
+
+	return apiErr
+}
+
 // Client handles communication with the Vestaboard Cloud API
 type Client struct {
 	token      string
@@ -52,17 +107,13 @@ func (c *Client) Send(characters [][]int) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 429 {
-		return fmt.Errorf("rate limited. Vestaboard allows ~1 message per 15 seconds")
-	}
-
 	if resp.StatusCode == 401 || resp.StatusCode == 403 {
 		return fmt.Errorf("authentication failed. Check your API token")
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+		return parseAPIError(resp.StatusCode, bodyBytes)
 	}
 
 	return nil
@@ -123,82 +174,77 @@ func (c *Client) Read() ([][]int, error) {
 
 // CharToDisplay converts a character code back to a displayable character
 func CharToDisplay(code int) string {
-	switch {
-	case code == 0:
-		return " " // blank
-	case code >= 1 && code <= 26:
-		return string(rune('A' + code - 1))
-	case code >= 27 && code <= 35:
-		return string(rune('1' + code - 27)) // codes 27-35 are 1-9
-	case code == 36:
-		return "0" // code 36 is 0
-	case code == 37:
+	switch code {
+	case 0:
+		return " "
+	case 37:
 		return "!"
-	case code == 38:
+	case 38:
 		return "@"
-	case code == 39:
+	case 39:
 		return "#"
-	case code == 40:
+	case 40:
 		return "$"
-	case code == 41:
+	case 41:
 		return "("
-	case code == 42:
+	case 42:
 		return ")"
-	case code == 43:
+	case 44:
 		return "-"
-	case code == 44:
+	case 45:
 		return "+"
-	case code == 45:
+	case 46:
 		return "&"
-	case code == 46:
+	case 47:
 		return "="
-	case code == 47:
+	case 48:
 		return ";"
-	case code == 48:
+	case 49:
 		return ":"
-	case code == 49:
+	case 52:
 		return "'"
-	case code == 50:
+	case 53:
 		return "\""
-	case code == 51:
+	case 54:
 		return "%"
-	case code == 52:
+	case 55:
 		return ","
-	case code == 53:
+	case 56:
 		return "."
-	case code == 54:
+	case 59:
 		return "/"
-	case code == 55:
+	case 60:
 		return "?"
-	case code == 56:
-		return "°" // degree symbol display
-	case code == 59:
+	case 62:
+		return "♥" // heart/degree
+	case 63:
 		return "🔴" // red
-	case code == 60:
+	case 64:
 		return "🟠" // orange
-	case code == 61:
+	case 65:
 		return "🟡" // yellow
-	case code == 62:
-		return "♥" // heart/degree (context dependent)
-	case code == 63:
-		return "🔴" // red
-	case code == 64:
-		return "🟠" // orange
-	case code == 65:
-		return "🟡" // yellow
-	case code == 66:
+	case 66:
 		return "🟢" // green
-	case code == 67:
+	case 67:
 		return "🔵" // blue
-	case code == 68:
+	case 68:
 		return "🟣" // violet
-	case code == 69:
+	case 69:
 		return "⬜" // white
-	case code == 70:
+	case 70:
 		return "⬛" // black
-	case code == 71:
+	case 71:
 		return "█" // filled
 	default:
+		if code >= 1 && code <= 26 {
+			return string(rune('A' + code - 1))
+		}
+		if code >= 27 && code <= 35 {
+			return string(rune('1' + code - 27))
+		}
+		if code == 36 {
+			return "0"
+		}
 		return "?"
 	}
 }

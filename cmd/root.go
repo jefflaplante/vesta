@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	cfg        *config.Config
-	deviceFlag string
+	cfg         *config.Config
+	deviceFlag  string
+	VerboseFlag bool
 )
 
 var rootCmd = &cobra.Command{
@@ -55,6 +56,7 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&deviceFlag, "device", "", "device type (note or flagship)")
+	rootCmd.PersistentFlags().BoolVarP(&VerboseFlag, "verbose", "v", false, "show detailed error information")
 }
 
 // GetConfig returns the loaded configuration

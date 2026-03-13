@@ -44,23 +44,31 @@ Examples:
 			fmt.Println(warnings)
 		}
 
-		// Format message to character array
-		characters := api.Format(parseResult.Message, cfg.Device, centerFlag)
+		// Format message to character array (with auto-wrap)
+		formatResult := api.Format(parseResult.Message, cfg.Device, centerFlag)
+
+		// Print format warning if any
+		if formatResult.Warning != "" {
+			fmt.Printf("Warning: %s\n", formatResult.Warning)
+		}
 
 		// Dry run - show what would be sent
 		if dryRunFlag {
 			fmt.Println("Character array:")
-			for i, row := range characters {
+			for i, row := range formatResult.Characters {
 				fmt.Printf("Row %d: %v\n", i, row)
 			}
 			fmt.Println("\nPreview:")
-			fmt.Println(api.DisplayBoard(characters))
+			fmt.Println(api.DisplayBoard(formatResult.Characters))
 			return nil
 		}
 
 		// Send to board
 		client := api.NewClient(token)
-		if err := client.Send(characters); err != nil {
+		if err := client.Send(formatResult.Characters); err != nil {
+			if apiErr, ok := err.(*api.APIError); ok && VerboseFlag {
+				fmt.Fprintln(cmd.ErrOrStderr(), apiErr.VerboseMessage())
+			}
 			return err
 		}
 
