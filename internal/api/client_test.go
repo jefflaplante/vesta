@@ -57,16 +57,16 @@ func TestCharToDisplay_Colors(t *testing.T) {
 		code int
 		want string
 	}{
-		{62, "♥"},  // heart
-		{63, "🔴"}, // red
-		{64, "🟠"}, // orange
-		{65, "🟡"}, // yellow
-		{66, "🟢"}, // green
-		{67, "🔵"}, // blue
-		{68, "🟣"}, // violet
-		{69, "⬜"}, // white
-		{70, "⬛"}, // black
-		{71, "█"},  // filled
+		{62, "♥"},                         // heart
+		{63, "\033[91m█\033[0m"},          // red
+		{64, "\033[38;5;208m█\033[0m"},    // orange (256-color)
+		{65, "\033[93m█\033[0m"},          // yellow
+		{66, "\033[92m█\033[0m"},          // green
+		{67, "\033[94m█\033[0m"},          // blue
+		{68, "\033[95m█\033[0m"},          // violet
+		{69, "\033[97m█\033[0m"},          // white
+		{70, "\033[90m█\033[0m"},          // black (dark gray)
+		{71, "\033[97m█\033[0m"},          // filled (white)
 	}
 
 	for _, tt := range tests {

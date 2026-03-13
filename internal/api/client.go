@@ -172,6 +172,19 @@ func (c *Client) Read() ([][]int, error) {
 	return layout, nil
 }
 
+// ANSI color codes for terminal display
+const (
+	ansiReset  = "\033[0m"
+	ansiRed    = "\033[91m"
+	ansiOrange = "\033[38;5;208m" // 256-color mode
+	ansiYellow = "\033[93m"
+	ansiGreen  = "\033[92m"
+	ansiBlue   = "\033[94m"
+	ansiViolet = "\033[95m"
+	ansiWhite  = "\033[97m"
+	ansiBlack  = "\033[90m" // dark gray for visibility on dark terminals
+)
+
 // CharToDisplay converts a character code back to a displayable character
 func CharToDisplay(code int) string {
 	switch code {
@@ -218,23 +231,23 @@ func CharToDisplay(code int) string {
 	case 62:
 		return "♥" // heart/degree
 	case 63:
-		return "🔴" // red
+		return ansiRed + "█" + ansiReset
 	case 64:
-		return "🟠" // orange
+		return ansiOrange + "█" + ansiReset
 	case 65:
-		return "🟡" // yellow
+		return ansiYellow + "█" + ansiReset
 	case 66:
-		return "🟢" // green
+		return ansiGreen + "█" + ansiReset
 	case 67:
-		return "🔵" // blue
+		return ansiBlue + "█" + ansiReset
 	case 68:
-		return "🟣" // violet
+		return ansiViolet + "█" + ansiReset
 	case 69:
-		return "⬜" // white
+		return ansiWhite + "█" + ansiReset
 	case 70:
-		return "⬛" // black
+		return ansiBlack + "█" + ansiReset
 	case 71:
-		return "█" // filled
+		return ansiWhite + "█" + ansiReset // filled = white block
 	default:
 		if code >= 1 && code <= 26 {
 			return string(rune('A' + code - 1))
