@@ -9,7 +9,48 @@ Features auto-wrapping, centering, color/symbol escape codes, and a dry-run prev
 ### Prerequisites
 
 - Go 1.23+
-- A Vestaboard with a [Read/Write API key](https://www.vestaboard.com/documentation) (cloud) or a Local API key (local)
+- A Vestaboard with a Read/Write API key (cloud) or a Local API key (local)
+
+### Obtaining API Tokens
+
+#### Cloud API Token (Read/Write Key)
+
+1. Go to the [Vestaboard web app](https://web.vestaboard.com/)
+2. Sign in with your Vestaboard account
+3. Select your board and go to **Settings**
+4. Navigate to **Integrations** > **Vestaboard API**
+5. Click **Enable** to generate a Read/Write API key
+6. Copy the key and store it securely
+
+#### Local API Token
+
+The local API allows direct communication with your board over your local network. To obtain a local API token:
+
+1. **Get your Enablement Token:**
+   - Open the Vestaboard app on your phone
+   - Go to your board's **Settings** > **Local API**
+   - Enable the Local API and copy the **Enablement Token**
+   - Note your board's **IP address** shown in the app
+
+2. **Exchange the Enablement Token for a Local API Key:**
+
+   ```sh
+   curl -X POST "http://YOUR_BOARD_IP:7000/local-api/enablement" \
+     -H "X-Vestaboard-Local-Api-Enablement-Token: YOUR_ENABLEMENT_TOKEN"
+   ```
+
+   Example:
+   ```sh
+   curl -X POST "http://192.168.1.100:7000/local-api/enablement" \
+     -H "X-Vestaboard-Local-Api-Enablement-Token: abc123-def456-ghi789"
+   ```
+
+   The response contains your Local API Key:
+   ```json
+   {"apiKey":"your-local-api-key-here"}
+   ```
+
+3. **Store the Local API Key** - this is the token you'll use with vesta. The enablement token is single-use and can be discarded.
 
 ### Install
 
@@ -59,7 +100,7 @@ vesta config show
 
 The local API allows direct communication with your Vestaboard over your local network, bypassing the cloud. This provides lower latency and works without internet connectivity.
 
-1. Get your Local API key from your Vestaboard's settings
+1. Obtain your Local API key (see [Obtaining API Tokens](#obtaining-api-tokens) above)
 2. Configure the local URL and token:
 
 ```sh
