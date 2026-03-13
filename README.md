@@ -25,7 +25,13 @@ go install .
 
 ### Configure
 
-Set your API token (stored in `~/.config/vesta/config.yaml`):
+Set your API token securely (hidden input, avoids shell history):
+
+```sh
+vesta config set token
+```
+
+Or provide it directly:
 
 ```sh
 vesta config set token YOUR_API_KEY
@@ -89,6 +95,13 @@ Preview:
 └───────────────┘
 ```
 
+### Read from stdin (scripting)
+
+```sh
+echo "Hello" | vesta send -
+cat message.txt | vesta send -c -
+```
+
 ### Read the board
 
 ```sh
@@ -132,6 +145,12 @@ vesta send "I <3 Go"
 |--------|------|---------|
 | Note | 3 | 15 |
 | Flagship | 6 | 22 |
+
+### Version information
+
+```sh
+vesta version
+```
 
 ## Development
 

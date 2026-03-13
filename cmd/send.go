@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/jeff/vesta/internal/api"
 	"github.com/jeff/vesta/internal/parser"
@@ -21,14 +24,27 @@ Supports escape codes for colors and symbols:
   {deg} (Flagship only), {<3} or <3 (Note only)
   {0}-{71} for raw character codes
 
+Use "-" to read from stdin for scripting:
+  echo "Hello" | vesta send -
+
 Examples:
   vesta send "Hello World"
   vesta send -c "Centered Message"
   vesta send "I <3 Go"
-  vesta send "{red}{green}{blue}"`,
+  vesta send "{red}{green}{blue}"
+  echo "Piped input" | vesta send -`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		message := args[0]
+
+		// Read from stdin if message is "-"
+		if message == "-" {
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("failed to read from stdin: %w", err)
+			}
+			message = strings.TrimSuffix(string(data), "\n")
+		}
 
 		// Get token
 		token, err := cfg.GetToken()
