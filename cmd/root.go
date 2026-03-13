@@ -12,6 +12,7 @@ var (
 	cfg         *config.Config
 	deviceFlag  string
 	VerboseFlag bool
+	localFlag   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -44,6 +45,21 @@ Examples:
 			cfg.Device = deviceFlag
 		}
 
+		// Override API mode from --local flag
+		if localFlag {
+			cfg.APIMode = config.APIModeLocal
+		}
+
+		// Validate local mode has required config
+		if cfg.IsLocalMode() {
+			if cfg.LocalURL == "" {
+				return fmt.Errorf("local mode requires local-url. Run 'vesta config set local-url <ip:port>'")
+			}
+			if cfg.LocalToken == "" {
+				return fmt.Errorf("local mode requires local-token. Run 'vesta config set local-token'")
+			}
+		}
+
 		return nil
 	},
 }
@@ -57,6 +73,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&deviceFlag, "device", "", "device type (note or flagship)")
 	rootCmd.PersistentFlags().BoolVarP(&VerboseFlag, "verbose", "v", false, "show detailed error information")
+	rootCmd.PersistentFlags().BoolVarP(&localFlag, "local", "l", false, "use local API instead of cloud")
 }
 
 // GetConfig returns the loaded configuration

@@ -9,7 +9,7 @@ Features auto-wrapping, centering, color/symbol escape codes, and a dry-run prev
 ### Prerequisites
 
 - Go 1.23+
-- A Vestaboard with a [Read/Write API key](https://www.vestaboard.com/documentation)
+- A Vestaboard with a [Read/Write API key](https://www.vestaboard.com/documentation) (cloud) or a Local API key (local)
 
 ### Install
 
@@ -53,6 +53,38 @@ Verify your configuration:
 
 ```sh
 vesta config show
+```
+
+### Local API Setup (Optional)
+
+The local API allows direct communication with your Vestaboard over your local network, bypassing the cloud. This provides lower latency and works without internet connectivity.
+
+1. Get your Local API key from your Vestaboard's settings
+2. Configure the local URL and token:
+
+```sh
+vesta config set local-url 192.168.1.100:7000  # Your board's IP
+vesta config set local-token                    # Prompts for token
+```
+
+3. Use local mode:
+
+```sh
+# Per-command with --local flag
+vesta send --local "Hello"
+vesta read --local
+
+# Or set as default
+vesta config set api-mode local
+vesta send "Hello"  # Now uses local API by default
+```
+
+Environment variables are also supported:
+
+```sh
+export VESTABOARD_LOCAL_URL=192.168.1.100:7000
+export VESTABOARD_LOCAL_API_KEY=YOUR_LOCAL_KEY
+export VESTABOARD_API_MODE=local
 ```
 
 ## Usage
@@ -137,6 +169,7 @@ vesta send "I <3 Go"
 | Flag | Description |
 |------|-------------|
 | `--device note\|flagship` | Override device type for this command |
+| `-l`, `--local` | Use local API instead of cloud |
 | `-v`, `--verbose` | Show detailed error information |
 
 ## Device types

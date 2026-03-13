@@ -13,14 +13,13 @@ var readCmd = &cobra.Command{
 	Long:  `Read and display the current message on your Vestaboard.`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get token
-		token, err := cfg.GetToken()
+		// Create client from config
+		client, err := api.NewClientFromConfig(cfg)
 		if err != nil {
 			return err
 		}
 
 		// Read from board
-		client := api.NewClient(token)
 		layout, err := client.Read()
 		if err != nil {
 			return err

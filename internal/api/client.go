@@ -8,10 +8,20 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/jeff/vesta/internal/config"
 )
 
 const (
 	cloudBaseURL = "https://rw.vestaboard.com/"
+)
+
+// APIMode represents the API mode (cloud or local)
+type APIMode string
+
+const (
+	ModeCloud APIMode = "cloud"
+	ModeLocal APIMode = "local"
 )
 
 // APIError represents an error from the Vestaboard API
@@ -69,37 +79,84 @@ func parseAPIError(statusCode int, body []byte) *APIError {
 	return apiErr
 }
 
-// Client handles communication with the Vestaboard Cloud API
+// Client handles communication with the Vestaboard API (cloud or local)
 type Client struct {
 	token      string
+	mode       APIMode
+	baseURL    string
 	httpClient *http.Client
 }
 
-// NewClient creates a new Vestaboard API client
+// NewClient creates a new Vestaboard cloud API client (backward compatible)
 func NewClient(token string) *Client {
 	return &Client{
-		token: token,
+		token:   token,
+		mode:    ModeCloud,
+		baseURL: cloudBaseURL,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
 }
 
+// NewLocalClient creates a new Vestaboard local API client
+func NewLocalClient(token, localURL string) *Client {
+	baseURL := fmt.Sprintf("http://%s/local-api/message", localURL)
+	return &Client{
+		token:   token,
+		mode:    ModeLocal,
+		baseURL: baseURL,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// NewClientFromConfig creates the appropriate client based on config
+func NewClientFromConfig(cfg *config.Config) (*Client, error) {
+	if cfg.IsLocalMode() {
+		token, err := cfg.GetLocalToken()
+		if err != nil {
+			return nil, err
+		}
+		url, err := cfg.GetLocalURL()
+		if err != nil {
+			return nil, err
+		}
+		return NewLocalClient(token, url), nil
+	}
+
+	token, err := cfg.GetToken()
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(token), nil
+}
+
+// setAuthHeader sets the appropriate auth header based on API mode
+func (c *Client) setAuthHeader(req *http.Request) {
+	if c.mode == ModeLocal {
+		req.Header.Set("X-Vestaboard-Local-Api-Key", c.token)
+	} else {
+		req.Header.Set("X-Vestaboard-Read-Write-Key", c.token)
+	}
+}
+
 // Send sends a character array to the Vestaboard
 func (c *Client) Send(characters [][]int) error {
-	// Read/Write API expects the array directly
+	// Both APIs expect the array directly
 	body, err := json.Marshal(characters)
 	if err != nil {
 		return fmt.Errorf("failed to marshal characters: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", cloudBaseURL, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", c.baseURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Vestaboard-Read-Write-Key", c.token)
+	c.setAuthHeader(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -128,12 +185,12 @@ type ReadResponse struct {
 
 // Read retrieves the current board state
 func (c *Client) Read() ([][]int, error) {
-	req, err := http.NewRequest("GET", cloudBaseURL, nil)
+	req, err := http.NewRequest("GET", c.baseURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("X-Vestaboard-Read-Write-Key", c.token)
+	c.setAuthHeader(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -151,6 +208,16 @@ func (c *Client) Read() ([][]int, error) {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
+	// Local API returns the array directly, cloud API wraps it
+	if c.mode == ModeLocal {
+		var layout [][]int
+		if err := json.Unmarshal(bodyBytes, &layout); err != nil {
+			return nil, fmt.Errorf("failed to parse layout: %w", err)
+		}
+		return layout, nil
+	}
+
+	// Cloud API response parsing
 	var readResp ReadResponse
 	if err := json.Unmarshal(bodyBytes, &readResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)

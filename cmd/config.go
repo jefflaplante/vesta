@@ -18,13 +18,23 @@ var configCmd = &cobra.Command{
 var configShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show current configuration",
-	Long:  `Display the current configuration settings (token is masked).`,
+	Long:  `Display the current configuration settings (tokens are masked).`,
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("Token:  %s\n", cfg.MaskedToken())
-		fmt.Printf("Device: %s\n", cfg.Device)
+		fmt.Printf("Token:       %s\n", cfg.MaskedToken())
+		fmt.Printf("Device:      %s\n", cfg.Device)
+		fmt.Printf("API Mode:    %s\n", cfg.APIMode)
+		fmt.Printf("Local URL:   %s\n", valueOrNotSet(cfg.LocalURL))
+		fmt.Printf("Local Token: %s\n", cfg.MaskedLocalToken())
 		return nil
 	},
+}
+
+func valueOrNotSet(v string) string {
+	if v == "" {
+		return "(not set)"
+	}
+	return v
 }
 
 var configSetCmd = &cobra.Command{
@@ -33,16 +43,23 @@ var configSetCmd = &cobra.Command{
 	Long: `Set a configuration value.
 
 Available keys:
-  token  - Your Vestaboard API token
-  device - Device type (note or flagship)
+  token       - Your Vestaboard cloud API token
+  device      - Device type (note or flagship)
+  api-mode    - API mode (cloud or local)
+  local-url   - Local API URL (ip:port, e.g., 192.168.1.100:7000)
+  local-token - Local API token
 
-For security, omit the value for token to enter it interactively (hidden input):
+For security, omit the value for token/local-token to enter it interactively:
   vesta config set token
+  vesta config set local-token
 
 Examples:
   vesta config set token abc123
-  vesta config set token          # prompts securely
-  vesta config set device flagship`,
+  vesta config set token            # prompts securely
+  vesta config set device flagship
+  vesta config set api-mode local
+  vesta config set local-url 192.168.1.100:7000
+  vesta config set local-token      # prompts securely`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
@@ -71,8 +88,36 @@ Examples:
 				return fmt.Errorf("invalid device type '%s'. Use 'note' or 'flagship'", value)
 			}
 			cfg.Device = value
+		case "api-mode":
+			if len(args) < 2 {
+				return fmt.Errorf("api-mode requires a value: 'cloud' or 'local'")
+			}
+			value := args[1]
+			if !config.ValidAPIMode(value) {
+				return fmt.Errorf("invalid API mode '%s'. Use 'cloud' or 'local'", value)
+			}
+			cfg.APIMode = value
+		case "local-url":
+			if len(args) < 2 {
+				return fmt.Errorf("local-url requires a value (e.g., 192.168.1.100:7000)")
+			}
+			cfg.LocalURL = args[1]
+		case "local-token":
+			var value string
+			if len(args) < 2 {
+				fmt.Print("Enter local API token: ")
+				bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+				if err != nil {
+					return fmt.Errorf("failed to read token: %w", err)
+				}
+				fmt.Println()
+				value = string(bytePassword)
+			} else {
+				value = args[1]
+			}
+			cfg.LocalToken = value
 		default:
-			return fmt.Errorf("unknown config key '%s'. Use 'token' or 'device'", key)
+			return fmt.Errorf("unknown config key '%s'. Use 'token', 'device', 'api-mode', 'local-url', or 'local-token'", key)
 		}
 
 		if err := cfg.Save(); err != nil {

@@ -46,12 +46,6 @@ Examples:
 			message = strings.TrimSuffix(string(data), "\n")
 		}
 
-		// Get token
-		token, err := cfg.GetToken()
-		if err != nil {
-			return err
-		}
-
 		// Parse escape codes
 		parseResult := parser.Parse(message, cfg.Device)
 
@@ -80,7 +74,10 @@ Examples:
 		}
 
 		// Send to board
-		client := api.NewClient(token)
+		client, err := api.NewClientFromConfig(cfg)
+		if err != nil {
+			return err
+		}
 		if err := client.Send(formatResult.Characters); err != nil {
 			if apiErr, ok := err.(*api.APIError); ok && VerboseFlag {
 				fmt.Fprintln(cmd.ErrOrStderr(), apiErr.VerboseMessage())
