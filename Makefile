@@ -4,7 +4,8 @@ BINARY := vesta
 GO := go
 
 build:
-	$(GO) build -o $(BINARY) .
+	$(GO) mod verify
+	CGO_ENABLED=0 $(GO) build -trimpath -ldflags="-s -w" -o $(BINARY) .
 
 test:
 	$(GO) test ./...

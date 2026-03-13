@@ -18,8 +18,17 @@ const (
 	DeviceFlagship = "flagship"
 )
 
-var configDir = filepath.Join(os.Getenv("HOME"), ".config", "vesta")
-var configFile = filepath.Join(configDir, "config.yaml")
+var configDir string
+var configFile string
+
+func init() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = os.Getenv("HOME")
+	}
+	configDir = filepath.Join(home, ".config", "vesta")
+	configFile = filepath.Join(configDir, "config.yaml")
+}
 
 // Load reads config from file and environment, with proper precedence.
 // Priority: env var > config file > defaults
@@ -38,6 +47,7 @@ func Load() (*Config, error) {
 	// Environment variable overrides config file
 	if envToken := os.Getenv("VESTABOARD_API_KEY"); envToken != "" {
 		cfg.Token = envToken
+		os.Unsetenv("VESTABOARD_API_KEY")
 	}
 
 	return cfg, nil
@@ -46,7 +56,7 @@ func Load() (*Config, error) {
 // Save writes the config to the config file
 func (c *Config) Save() error {
 	// Ensure config directory exists
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 

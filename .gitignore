@@ -7,5 +7,12 @@ vesta
 *.swp
 *.swo
 
+# Secrets / config
+.env
+.env.*
+config.yaml
+*.key
+*.pem
+
 # OS
 .DS_Store

@@ -112,7 +112,7 @@ func (c *Client) Send(characters [][]int) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 		return parseAPIError(resp.StatusCode, bodyBytes)
 	}
 
@@ -145,7 +145,7 @@ func (c *Client) Read() ([][]int, error) {
 		return nil, fmt.Errorf("authentication failed. Check your API token")
 	}
 
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
