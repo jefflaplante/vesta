@@ -1,108 +1,229 @@
 package api
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"time"
+	"strings"
+	"unicode"
 
 	"github.com/jeff/vesta/internal/config"
 )
 
-const vbmlURL = "https://vbml.vestaboard.com/compose"
-
-// VBMLClient handles communication with the VBML API
-type VBMLClient struct {
-	httpClient *http.Client
-}
-
-// NewVBMLClient creates a new VBML API client
-func NewVBMLClient() *VBMLClient {
-	return &VBMLClient{
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}
-}
-
-// VBMLRequest represents a request to the VBML compose endpoint
-type VBMLRequest struct {
-	Components []VBMLComponent `json:"components"`
-}
-
-// VBMLComponent represents a component in the VBML request
-type VBMLComponent struct {
-	Template VBMLTemplate `json:"template"`
-}
-
-// VBMLTemplate represents the template for formatting
-type VBMLTemplate struct {
-	Style  string `json:"style"`
-	Height int    `json:"height"`
-	Width  int    `json:"width"`
-	Justify string `json:"justify,omitempty"`
-	Align   string `json:"align,omitempty"`
-}
-
-// VBMLResponse represents the response from the VBML API
-type VBMLResponse struct {
-	Characters [][]int `json:"characters"`
-}
-
-// Format sends a message to the VBML API for formatting
-func (c *VBMLClient) Format(message string, device string, centered bool) ([][]int, error) {
-	// Get device dimensions
+// Format converts a message string to a Vestaboard character array.
+// Handles text, escape codes like {63}, and centering.
+func Format(message string, device string, centered bool) [][]int {
 	height, width := getDimensions(device)
 
-	// Build request
-	template := VBMLTemplate{
-		Style:  message,
-		Height: height,
-		Width:  width,
+	// Handle literal \n escape sequences
+	message = strings.ReplaceAll(message, "\\n", "\n")
+
+	// Split message into lines
+	lines := strings.Split(message, "\n")
+
+	// Limit to board height
+	if len(lines) > height {
+		lines = lines[:height]
 	}
 
-	if centered {
-		template.Justify = "center"
-		template.Align = "center"
+	// Convert each line to character codes
+	var rows [][]int
+	for _, line := range lines {
+		row := lineToCharCodes(line, width, centered)
+		rows = append(rows, row)
 	}
 
-	req := VBMLRequest{
-		Components: []VBMLComponent{
-			{Template: template},
-		},
+	// Pad with empty rows if needed
+	for len(rows) < height {
+		rows = append(rows, make([]int, width))
 	}
 
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	// If centering vertically, shift rows
+	if centered && len(lines) < height {
+		emptyRows := height - len(lines)
+		topPad := emptyRows / 2
+		if topPad > 0 {
+			newRows := make([][]int, height)
+			for i := 0; i < height; i++ {
+				if i < topPad || i >= topPad+len(lines) {
+					newRows[i] = make([]int, width)
+				} else {
+					newRows[i] = rows[i-topPad]
+				}
+			}
+			rows = newRows
+		}
 	}
 
-	httpReq, err := http.NewRequest("POST", vbmlURL, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	return rows
+}
+
+// lineToCharCodes converts a single line to character codes
+func lineToCharCodes(line string, width int, centered bool) []int {
+	codes := parseLineToCharCodes(line)
+
+	// Truncate if too long
+	if len(codes) > width {
+		codes = codes[:width]
 	}
 
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("network error: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("VBML API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	// Center or left-align
+	if centered && len(codes) < width {
+		padding := (width - len(codes)) / 2
+		result := make([]int, width)
+		for i, code := range codes {
+			result[padding+i] = code
+		}
+		return result
 	}
 
-	var vbmlResp VBMLResponse
-	if err := json.NewDecoder(resp.Body).Decode(&vbmlResp); err != nil {
-		return nil, fmt.Errorf("failed to decode VBML response: %w", err)
+	// Pad to width
+	for len(codes) < width {
+		codes = append(codes, 0)
 	}
 
-	return vbmlResp.Characters, nil
+	return codes
+}
+
+// parseLineToCharCodes parses a line with escape codes into character codes
+func parseLineToCharCodes(line string) []int {
+	var codes []int
+	runes := []rune(line)
+	i := 0
+
+	for i < len(runes) {
+		// Check for escape code {N} or {name}
+		if runes[i] == '{' {
+			end := -1
+			for j := i + 1; j < len(runes); j++ {
+				if runes[j] == '}' {
+					end = j
+					break
+				}
+			}
+			if end > i+1 {
+				content := string(runes[i+1 : end])
+				if code, ok := parseEscapeCode(content); ok {
+					codes = append(codes, code)
+					i = end + 1
+					continue
+				}
+			}
+		}
+
+		// Regular character
+		code := charToCode(runes[i])
+		codes = append(codes, code)
+		i++
+	}
+
+	return codes
+}
+
+// parseEscapeCode parses the content inside braces and returns the character code
+func parseEscapeCode(content string) (int, bool) {
+	// Try numeric first
+	var num int
+	if _, err := parseNumber(content); err == nil {
+		num, _ = parseNumber(content)
+		if num >= 0 && num <= 71 {
+			return num, true
+		}
+	}
+
+	// Named codes
+	switch strings.ToLower(content) {
+	case "red":
+		return 63, true
+	case "orange":
+		return 64, true
+	case "yellow":
+		return 65, true
+	case "green":
+		return 66, true
+	case "blue":
+		return 67, true
+	case "violet":
+		return 68, true
+	case "white":
+		return 69, true
+	case "black":
+		return 70, true
+	case "filled":
+		return 71, true
+	case "deg":
+		return 62, true
+	case "<3":
+		return 62, true
+	}
+
+	return 0, false
+}
+
+func parseNumber(s string) (int, error) {
+	var n int
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, nil
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n, nil
+}
+
+// charToCode converts a rune to a Vestaboard character code
+func charToCode(r rune) int {
+	r = unicode.ToUpper(r)
+
+	switch {
+	case r >= 'A' && r <= 'Z':
+		return int(r - 'A' + 1)
+	case r >= '1' && r <= '9':
+		return int(r - '1' + 27) // 1-9 map to codes 27-35
+	case r == '0':
+		return 36 // 0 maps to code 36
+	case r == ' ':
+		return 0
+	case r == '!':
+		return 37
+	case r == '@':
+		return 38
+	case r == '#':
+		return 39
+	case r == '$':
+		return 40
+	case r == '(':
+		return 41
+	case r == ')':
+		return 42
+	case r == '-':
+		return 44
+	case r == '+':
+		return 45
+	case r == '&':
+		return 46
+	case r == '=':
+		return 47
+	case r == ';':
+		return 48
+	case r == ':':
+		return 49
+	case r == '\'':
+		return 52
+	case r == '"':
+		return 53
+	case r == '%':
+		return 54
+	case r == ',':
+		return 55
+	case r == '.':
+		return 56
+	case r == '/':
+		return 59
+	case r == '?':
+		return 60
+	case r == '°':
+		return 62
+	default:
+		return 0 // Unknown characters become blank
+	}
 }
 
 // getDimensions returns the height and width for a device type
@@ -111,8 +232,8 @@ func getDimensions(device string) (int, int) {
 	case config.DeviceFlagship:
 		return 6, 22
 	case config.DeviceNote:
-		fallthrough
-	default:
 		return 3, 15
+	default:
+		return 6, 22
 	}
 }

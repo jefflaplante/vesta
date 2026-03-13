@@ -9,6 +9,7 @@ import (
 )
 
 var centerFlag bool
+var dryRunFlag bool
 
 var sendCmd = &cobra.Command{
 	Use:   "send [message]",
@@ -43,11 +44,18 @@ Examples:
 			fmt.Println(warnings)
 		}
 
-		// Format via VBML
-		vbmlClient := api.NewVBMLClient()
-		characters, err := vbmlClient.Format(parseResult.Message, cfg.Device, centerFlag)
-		if err != nil {
-			return fmt.Errorf("failed to format message: %w", err)
+		// Format message to character array
+		characters := api.Format(parseResult.Message, cfg.Device, centerFlag)
+
+		// Dry run - show what would be sent
+		if dryRunFlag {
+			fmt.Println("Character array:")
+			for i, row := range characters {
+				fmt.Printf("Row %d: %v\n", i, row)
+			}
+			fmt.Println("\nPreview:")
+			fmt.Println(api.DisplayBoard(characters))
+			return nil
 		}
 
 		// Send to board
@@ -64,4 +72,5 @@ Examples:
 func init() {
 	rootCmd.AddCommand(sendCmd)
 	sendCmd.Flags().BoolVarP(&centerFlag, "center", "c", false, "center the message")
+	sendCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "show character array without sending")
 }

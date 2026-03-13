@@ -32,6 +32,7 @@ func NewClient(token string) *Client {
 
 // Send sends a character array to the Vestaboard
 func (c *Client) Send(characters [][]int) error {
+	// Read/Write API expects the array directly
 	body, err := json.Marshal(characters)
 	if err != nil {
 		return fmt.Errorf("failed to marshal characters: %w", err)
@@ -70,7 +71,7 @@ func (c *Client) Send(characters [][]int) error {
 // ReadResponse represents the response from reading the board
 type ReadResponse struct {
 	CurrentMessage struct {
-		Layout [][]int `json:"layout"`
+		Layout json.RawMessage `json:"layout"`
 	} `json:"currentMessage"`
 }
 
@@ -93,17 +94,31 @@ func (c *Client) Read() ([][]int, error) {
 		return nil, fmt.Errorf("authentication failed. Check your API token")
 	}
 
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var readResp ReadResponse
-	if err := json.NewDecoder(resp.Body).Decode(&readResp); err != nil {
+	if err := json.Unmarshal(bodyBytes, &readResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return readResp.CurrentMessage.Layout, nil
+	// Try to parse layout as [][]int first
+	var layout [][]int
+	if err := json.Unmarshal(readResp.CurrentMessage.Layout, &layout); err != nil {
+		// Layout might be a string-encoded array, try parsing it
+		var layoutStr string
+		if err := json.Unmarshal(readResp.CurrentMessage.Layout, &layoutStr); err != nil {
+			return nil, fmt.Errorf("failed to parse layout: %w", err)
+		}
+		if err := json.Unmarshal([]byte(layoutStr), &layout); err != nil {
+			return nil, fmt.Errorf("failed to parse layout string: %w", err)
+		}
+	}
+
+	return layout, nil
 }
 
 // CharToDisplay converts a character code back to a displayable character
@@ -113,8 +128,10 @@ func CharToDisplay(code int) string {
 		return " " // blank
 	case code >= 1 && code <= 26:
 		return string(rune('A' + code - 1))
-	case code >= 27 && code <= 36:
-		return string(rune('0' + code - 27))
+	case code >= 27 && code <= 35:
+		return string(rune('1' + code - 27)) // codes 27-35 are 1-9
+	case code == 36:
+		return "0" // code 36 is 0
 	case code == 37:
 		return "!"
 	case code == 38:
