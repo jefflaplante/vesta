@@ -278,7 +278,7 @@ func charToCode(r rune) int {
 	case r >= '1' && r <= '9':
 		return int(r - '1' + 27) // 1-9 map to codes 27-35
 	case r == '0':
-		return 36 // 0 maps to code 36
+		return 36
 	case r == ' ':
 		return 0
 	case r == '!':
@@ -293,18 +293,20 @@ func charToCode(r rune) int {
 		return 41
 	case r == ')':
 		return 42
+	case r == '*':
+		return 43
 	case r == '-':
 		return 44
 	case r == '+':
-		return 45
-	case r == '&':
 		return 46
-	case r == '=':
+	case r == '&':
 		return 47
-	case r == ';':
+	case r == '=':
 		return 48
-	case r == ':':
+	case r == ';':
 		return 49
+	case r == ':':
+		return 50
 	case r == '\'':
 		return 52
 	case r == '"':
@@ -322,7 +324,7 @@ func charToCode(r rune) int {
 	case r == '°':
 		return 62
 	default:
-		return 0 // Unknown characters become blank
+		return 0
 	}
 }
 

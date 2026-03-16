@@ -63,8 +63,8 @@ func TestCharToCode_SpecialChars(t *testing.T) {
 		want int
 	}{
 		{'!', 37}, {'@', 38}, {'#', 39}, {'$', 40},
-		{'(', 41}, {')', 42}, {'-', 44}, {'+', 45},
-		{'&', 46}, {'=', 47}, {';', 48}, {':', 49},
+		{'(', 41}, {')', 42}, {'*', 43}, {'-', 44},
+		{'+', 46}, {'&', 47}, {'=', 48}, {';', 49}, {':', 50},
 		{'\'', 52}, {'"', 53}, {'%', 54}, {',', 55},
 		{'.', 56}, {'/', 59}, {'?', 60},
 	}
@@ -85,7 +85,7 @@ func TestCharToCode_Space(t *testing.T) {
 }
 
 func TestCharToCode_UnknownCharsReturnZero(t *testing.T) {
-	unknowns := []rune{'~', '`', '[', ']', '{', '}', '\\', '|', '^', '*'}
+	unknowns := []rune{'~', '`', '[', ']', '{', '}', '\\', '|', '^'}
 	for _, r := range unknowns {
 		got := charToCode(r)
 		if got != 0 {
@@ -109,10 +109,10 @@ func TestParseEscapeCode_Colors(t *testing.T) {
 		{"white", 69, true},
 		{"black", 70, true},
 		{"filled", 71, true},
-		{"RED", 63, true},   // case insensitive
-		{"Red", 63, true},   // case insensitive
-		{"deg", 62, true},   // degree
-		{"<3", 62, true},    // heart
+		{"RED", 63, true}, // case insensitive
+		{"Red", 63, true}, // case insensitive
+		{"deg", 62, true}, // degree
+		{"<3", 62, true},  // heart
 	}
 
 	for _, tt := range tests {
@@ -348,10 +348,10 @@ func TestCountDisplayChars(t *testing.T) {
 	}{
 		{"HELLO", 5},
 		{"HI THERE", 8},
-		{"{red}", 1},              // escape code counts as 1
-		{"{red}{blue}", 2},        // two escape codes
-		{"A {red} B", 5},          // mixed
-		{"{red}HELLO{blue}", 7},   // escape + text
+		{"{red}", 1},            // escape code counts as 1
+		{"{red}{blue}", 2},      // two escape codes
+		{"A {red} B", 5},        // mixed
+		{"{red}HELLO{blue}", 7}, // escape + text
 		{"", 0},
 	}
 
